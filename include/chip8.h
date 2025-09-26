@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <error.h>
 
+#define PROG_MEM_SIZE 0x1000
 #define PROG_ENTRY    0x200
 #define PROG_UBOUND   PROG_ENTRY + 0xFFF
 #define FONT_SADDR    0x50
@@ -11,11 +12,13 @@
 #define NULL_ADDR     0x0
 
 #define STACK_SIZE    0x100
-#define STACK_LBOUND  0x1000  
+#define STACK_LBOUND  PROG_MEM_SIZE 
 #define STACK_UBOUND  STACK_LBOUND + STACK_SIZE  
 
+#define MEM_SIZE      PROG_MEM_SIZE + STACK_SIZE
+
 // timer frequency in hz
-#define TIMER_FREQ    0x3C
+#define TIMER_FREQ    0x3c
 // clock default freq, 700hz
 #define CLOCK_DEFAULT 0x2bc
 
@@ -70,9 +73,12 @@ typedef struct {
   unsigned int sound; // bool, is a sound timer
 } timer_s;
 
+
+
 timer_s *init_timer(int init_val, unsigned int sound);
 int     dec_timer(timer_s *tm);
 timer_s *set_timer(timer_s *tm, int val);
+
 
 
 
@@ -87,17 +93,24 @@ typedef struct {
 } cpu_s;
 
 
+typedef struct {
+  char      *mem_base;
+  uint16_t  sp_off;
+} mem_s;
 
 typedef struct {
   cpu_s     *cpu;
-  // see if you need to separate pointers for pre-program memory space and program mem space
-  char      *mem; // 4kib
-  char      *st; // also resides in emulated memory, have to be 16 16bit entries
+  mem_s     *mem; // 4kib
   display_s *dp; // stl display handler
 } emu_s;
 
 
 // emu funcs
-const emu_s *emu_ctor(emu_s *emu, const char *prog_name, uint16_t clock_s); 
+const emu_s *emu_ctor(emu_s **emu, uint16_t clock_s); 
+mem_s       *s_push(mem_s *mem, uint16_t val);
+uint16_t    s_pop(mem_s *mem);
+
+const emu_s *load_rom(emu_s *emu, const char *prog_name);
+void        free_emu(emu_s *emu);
 
 #endif

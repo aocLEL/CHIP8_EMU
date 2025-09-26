@@ -6,19 +6,21 @@ CFLAGS = -Wall \
          -Wextra \
 		 -MMD \
 		 -MP
-PROD_FLAGS = -DVERSION_STR="\"0.0.1\"" \
-							-DDBG_ENABLE=1
-TEST_FLAGS = -DDBG_ENABLE=1 \
-						 -DVERSION_STR="\"0.0.1_t\""
-TEST_EN = 1
-CARGS := $(CSTD) $(CFLAGS) $(if $(filter 1, $(TEST_EN)), $(TEST_FLAGS),$(PROD_FLAGS))
-INCLUDE_DIRS = include/
-CCMD := $(CC) $(CARGS) -I$(INCLUDE_DIRS)
-BUILD_DIR = build
-SRC_DIR = src
-SRC = emu.c
+PROD_FLAGS    = -DVERSION_STR="\"0.0.1\"" \
+							  -DDBG_ENABLE=1
+TEST_FLAGS    = -DDBG_ENABLE=1 \
+						    -DVERSION_STR="\"0.0.1_t\""
+TEST_EN       = 1
+CARGS         := $(CSTD) $(CFLAGS) $(if $(filter 1, $(TEST_EN)), $(TEST_FLAGS),$(PROD_FLAGS))
+INCLUDE_DIRS  = include/
+DEPS          = sdl
+DEPS_CMD      = `pkg-config --cflags --libs $(DEPS)`
+CCMD         := $(CC) $(CARGS) -I$(INCLUDE_DIRS) $(DEPS_CMD) 
+BUILD_DIR     = build
+SRC_DIR       = src
+SRC           = emu.c
 			
-TEST_SRC = emu.c
+TEST_SRC      = emu.c
 
 #SRC := $(patstub %.c,src/%.c,$(SRC))
 # for each file in SRC or TEST_SRC, create the corrisponding object file in build
