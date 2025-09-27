@@ -3,7 +3,7 @@
 #include <emu.h>
 
 #define FILE_MAX    256
-
+#define WIN_NAME    "CHIP8 Emulator"
 
 
 // importare parser opzioni
@@ -17,15 +17,22 @@ int main(int argc, char **argv) {
   }
   emu_s *emu;
   uint16_t clock_s = CLOCK_DEFAULT;
+  char full_win_name[FILE_MAX];
+  sprintf(full_win_name, "%s -- %s", WIN_NAME, prog_name);
   if( opt[O_s].set ) clock_s = (uint16_t)(opt[O_s].value->ui);
   printf("DBG PROG NAME & CLOCK: %s %hu \n", prog_name, clock_s);
-  emu_ctor(&emu, clock_s);
-  load_rom(emu, prog_name);
-  
+  // setting display info
+  unsigned int res_x  = opt[O_w].set ? (unsigned int)(opt[O_w].value->ui) : DEFAULT_REAL_DPW;
+  unsigned int res_y  = opt[O_h].set ? (unsigned int)(opt[O_h].value->ui) : DEFAULT_REAL_DPH;
+  unsigned int ref_rt = opt[O_r].set ? (unsigned int)(opt[O_r].value->ui) : DEFAULT_RFR;
+  // emu constructor
+  emu_ctor(&emu, clock_s, full_win_name, res_x, res_y, ref_rt);
+  load_rom(emu, prog_name);  
   // EMU LOOP
-
+  emu_loop(emu);
 
   // END
+  display_free(emu->dp);
   free(prog_name);
   free_emu(emu);
   return 0;

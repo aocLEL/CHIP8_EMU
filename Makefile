@@ -13,14 +13,22 @@ TEST_FLAGS    = -DDBG_ENABLE=1 \
 TEST_EN       = 1
 CARGS         := $(CSTD) $(CFLAGS) $(if $(filter 1, $(TEST_EN)), $(TEST_FLAGS),$(PROD_FLAGS))
 INCLUDE_DIRS  = include/
-DEPS          = sdl
+DEPS          = sdl3
 DEPS_CMD      = `pkg-config --cflags --libs $(DEPS)`
 CCMD         := $(CC) $(CARGS) -I$(INCLUDE_DIRS) $(DEPS_CMD) 
 BUILD_DIR     = build
 SRC_DIR       = src
-SRC           = emu.c
+SRC           = emu.c\
+                chip8.c\
+                opt.c\
+                graphics/display.c\
+                utility/utils.c
 			
-TEST_SRC      = emu.c
+TEST_SRC      = emu.c\
+                chip8.c\
+                opt.c\
+                graphics/display.c\
+                utility/utils.c
 
 #SRC := $(patstub %.c,src/%.c,$(SRC))
 # for each file in SRC or TEST_SRC, create the corrisponding object file in build
