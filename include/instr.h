@@ -11,6 +11,15 @@
 #define INSTR_SETIX               0xA000
 #define INSTR_DRAW                0xD000
 
+#define ON_COLOR_R    255
+#define ON_COLOR_G    255
+#define ON_COLOR_B    255
+
+#define OFF_COLOR_R   0
+#define OFF_COLOR_G   0
+#define OFF_COLOR_B   0
+
+
 #define chip_arg16 uint16_t
 #define chip_arg8  uint8_t
 

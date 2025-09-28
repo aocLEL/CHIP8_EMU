@@ -39,6 +39,11 @@ display_s *init_display(display_s **dp, const char *win_name, unsigned int res_x
   (*dp)->res_x  = res_x;
   (*dp)->res_y  = res_y;
   (*dp)->ref_rt = ref_rt;
+  // initialize pixmap
+  unsigned int pixmap_dim = sizeof(uint8_t) * CHIP_DPW * CHIP_DPH;
+  if(!((*dp)->pixmap = malloc(pixmap_dim)))
+    die("Memory allocation failed: %s", strerror(errno));
+  memset((*dp)->pixmap, 0,  pixmap_dim);
   return *dp;
 }
 
@@ -51,6 +56,7 @@ void display_free(display_s *dp) {
   SDL_DestroyRenderer(dp->hw->rnd);
   SDL_DestroyWindow(dp->hw->win);
   SDL_Quit();
+  free(dp->pixmap);
   free(dp->hw);
   free(dp);
 }

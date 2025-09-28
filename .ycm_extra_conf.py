@@ -44,6 +44,7 @@ flags = [
 '-Wall',
 '-Wextra',
 '-Werror',
+'-Wno-int-to-pointer-cast',
 '-x',
 'c',
 '-isystem',

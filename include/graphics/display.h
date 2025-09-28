@@ -10,6 +10,7 @@
 #define DEFAULT_REAL_DPH    720
 #define DEFAULT_RFR         60
 
+#define PIXMAP_IDX(r, c) ((r) * CHIP_DPW + (c))
 
 typedef struct {
   SDL_Window    *win;
@@ -22,6 +23,7 @@ typedef struct {
   unsigned int res_y;
   unsigned int ref_rt;
   sdl_s        *hw;
+  uint8_t      *pixmap;
 } display_s;
 
 

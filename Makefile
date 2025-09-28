@@ -4,8 +4,9 @@ CSTD = -std=gnu23
 CFLAGS = -Wall \
          -Werror \
          -Wextra \
-		 -MMD \
-		 -MP
+         -Wno-int-to-pointer-cast\
+		     -MMD \
+		     -MP
 PROD_FLAGS    = -DVERSION_STR="\"0.0.1\"" \
 							  -DDBG_ENABLE=1
 TEST_FLAGS    = -DDBG_ENABLE=1 \
@@ -20,12 +21,14 @@ BUILD_DIR     = build
 SRC_DIR       = src
 SRC           = emu.c\
                 chip8.c\
+                instr.c\
                 opt.c\
                 graphics/display.c\
                 utility/utils.c
 			
 TEST_SRC      = emu.c\
                 chip8.c\
+                instr.c\
                 opt.c\
                 graphics/display.c\
                 utility/utils.c

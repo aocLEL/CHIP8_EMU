@@ -32,7 +32,6 @@ int main(int argc, char **argv) {
   emu_loop(emu);
 
   // END
-  display_free(emu->dp);
   free(prog_name);
   free_emu(emu);
   return 0;

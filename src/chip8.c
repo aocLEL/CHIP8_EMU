@@ -2,11 +2,15 @@
 #include <stdio.h>
 #include <fcntl.h>
 #include <stdlib.h>
+#include <time.h>
+#include <unistd.h>
 #include <error.h>
 #include <string.h>
 #include <errno.h>
 #include <assert.h>
 #include <instr.h>
+#include <arpa/inet.h>
+#include <SDL3/SDL.h>
 
 #define __private static
 
@@ -51,12 +55,13 @@ timer_s *set_timer(timer_s *tm, int val) {
 }
 
 inline int dec_timer(timer_s *tm) {
-  return --tm->value ? tm->value : (tm->value = 60); 
+  if(tm->value > 0) --tm->value;
+  return tm->value;
 }
 
 
 mem_s *s_push(mem_s *mem, uint16_t val) {
-  char *sp = mem->mem_base + mem->sp_off;
+  mem_p sp = mem->mem_base + mem->sp_off;
   if(mem->sp_off >= STACK_UBOUND)
     die("*** Stack Overflow *** ABORT!!!");
   memcpy(sp, &val, 2);
@@ -65,7 +70,7 @@ mem_s *s_push(mem_s *mem, uint16_t val) {
 }
 
 uint16_t s_pop(mem_s *mem) {
-  char *sp = mem->mem_base + mem->sp_off;
+  mem_p sp = mem->mem_base + mem->sp_off;
   if(mem->sp_off <= STACK_LBOUND) 
     die("*** Stack underflow *** ABORT!!!");
   uint16_t val = *((uint16_t *)sp);
@@ -79,8 +84,9 @@ __private mem_s *init_mem(emu_s *emu) {
   if(!(mem = malloc(sizeof(mem_s))))
     die("Memory allocation failed: %s", strerror(errno));
   // allocating virtual memory space and setting sp
-  if(!(mem->mem_base = malloc(sizeof(char) * MEM_SIZE)))
+  if(!(mem->mem_base = malloc(sizeof(unsigned char) * MEM_SIZE)))
     die("Memory allocation failed: %s", strerror(errno));
+  memset(mem->mem_base, 0, sizeof(unsigned char) * MEM_SIZE);
   mem->sp_off = STACK_LBOUND;
   // loading fontset
   assert(FONT_SADDR + sizeof(fontset) - 1 == FONT_EADDR);
@@ -89,10 +95,52 @@ __private mem_s *init_mem(emu_s *emu) {
   return mem; 
 }
 
+
+// clock funcs
+__private void init_clock(clock_s **clk, uint16_t clock_sp) {
+  if(!(*clk = malloc(sizeof(clock_s)))) 
+    die("Memory allocation failed: %s", strerror(errno));
+  (*clk)->clock_speed = clock_sp;
+  (*clk)->curr = 0;
+  (*clk)->cycle_duration_ns = NS_S / (*clk)->clock_speed;
+}
+
+
+__private uint64_t get_time_ns() {
+  struct timespec ts;
+  clock_gettime(CLOCK_MONOTONIC, &ts);
+  return ts.tv_sec * NS_S + ts.tv_nsec;
+}
+
+__private inline void clock_start(clock_s *clk) {
+  clk->curr = get_time_ns();
+}
+
+// clock sync, sleep for remaining time and reset time slice for next instruction
+__private void clock_sync(clock_s *clk) {
+  // sleep for the remaining time
+  uint64_t elapsed = get_time_ns() - clk->curr;
+  long sleep_time  = clk->cycle_duration_ns - elapsed;
+  if (sleep_time > 0) {
+    struct timespec ts;
+    ts.tv_sec = sleep_time / NS_S;
+    ts.tv_nsec = sleep_time % NS_S;
+    nanosleep(&ts, NULL);
+  }
+  // start another cycle
+  clock_start(clk);
+}
+
+__private inline unsigned int clock_exp(clock_s *clk) {
+  uint64_t elapsed = get_time_ns() - clk->curr;
+  return elapsed >= clk->cycle_duration_ns;
+}
+
+
 __private cpu_s *init_cpu(emu_s *emu, uint16_t clock_s) {
   if(!(emu->cpu = malloc(sizeof(cpu_s))))
     die("Memory allocation failed: %s", strerror(errno));
-  emu->cpu->clock_speed = clock_s;
+  init_clock(&emu->cpu->clock, clock_s);
   emu->cpu->i_r = NULL_ADDR;
   emu->cpu->s_timer = init_timer(TIMER_FREQ, 0);
   emu->cpu->d_timer = init_timer(TIMER_FREQ, 1);
@@ -119,8 +167,8 @@ const emu_s *load_rom(emu_s *emu, const char *prog_name) {
     fprintf(stderr, "Can't open specified ROM: %s\n", strerror(errno));
     exit(EXIT_FAILURE);
   }
-  char *prog_mem = emu->mem->mem_base + PROG_ENTRY;
-  if((read(fd, prog_mem, PROG_MEM_SIZE - PROG_ENTRY)) == -1) {
+  mem_p prog_mem = emu->mem->mem_base + PROG_ENTRY;
+  if((read(fd, prog_mem, PROG_MEM_SIZE)) == -1) {
     fprintf(stderr, "Can't load rom into memory: %s\n", strerror(errno));
     exit(EXIT_FAILURE);
   }
@@ -137,8 +185,8 @@ const emu_s *load_rom(emu_s *emu, const char *prog_name) {
 
 // fetch instruction at PC and increment it
 __private instr_t fetch_instr(emu_s *emu) {
-  instr_t n_instr = *((instr_t*)(emu->mem->mem_base + emu->cpu->pc_r));
-  printf("DBG INSTR: %X\n", n_instr);
+  instr_t *pc = (instr_t*)(emu->mem->mem_base + emu->cpu->pc_r);
+  instr_t n_instr = htons(*pc);
   emu->cpu->pc_r += 2;
   return n_instr;
 }
@@ -151,7 +199,8 @@ __private unsigned int exec_instr(emu_s *emu) {
  switch(opcode) {
    case 0x0:
       // clear screen
-      instr_clear_screen(emu);
+      if(instr == INSTR_CLEAR_SCREEN)
+        instr_clear_screen(emu);
       break;
    case 0x1:
       // jump
@@ -178,28 +227,74 @@ __private unsigned int exec_instr(emu_s *emu) {
  }
  // decode
  // execute
+ return 1;
 }
 
+
+// draw pixmap
+__private void draw_pixmap(emu_s *emu) {
+  // get scaled pixel dimensions
+  uint8_t      *pixmap  = emu->dp->pixmap;
+  unsigned int xpix_dim = emu->dp->res_x / CHIP_DPW;
+  unsigned int ypix_dim = emu->dp->res_y / CHIP_DPH;
+  // redraw backbuffer
+  if(!SDL_SetRenderDrawColor(emu->dp->hw->rnd, ON_COLOR_R, ON_COLOR_G, ON_COLOR_B, SDL_ALPHA_OPAQUE)) {
+    SDL_Log("Couldn't set pixel color : %s", SDL_GetError());
+    die("*** EMU GRAPHICS ERROR ***");
+  }
+  for(size_t y = 0; y < CHIP_DPH; y++) {
+    for(size_t x = 0; x < CHIP_DPW; x++) {
+      if(pixmap[PIXMAP_IDX(y, x)]) {
+        SDL_FRect rect = {x * xpix_dim, y * ypix_dim, xpix_dim, ypix_dim};
+        if(!SDL_RenderFillRect(emu->dp->hw->rnd, &rect)) {
+          SDL_Log("Couldn't draw pixel : %s", SDL_GetError());
+          die("*** EMU GRAPHICS ERROR ***");
+        }
+      }
+    }
+  }
+  if(!SDL_RenderPresent(emu->dp->hw->rnd)) {
+    SDL_Log("Couldn't present current renderer backbuffer : %s", SDL_GetError());
+    die("*** EMU GRAPHICS ERROR ***");
+  }
+}
+
+// cpu clock emulation
+
+
 // remove unused
-void emu_loop(emu_s *emu __attribute__((unused))) {
+void emu_loop(emu_s *emu) {
   SDL_Event e;
   bool quit = false;
   SDL_SetRenderDrawColor(emu->dp->hw->rnd, 0, 0, 0, 255);
   SDL_RenderClear(emu->dp->hw->rnd);
   SDL_RenderPresent(emu->dp->hw->rnd);
+  // create SDL clock
+  clock_s *dp_clk;
+  init_clock(&dp_clk, DEFAULT_RFR);
+  // start clocks
+  clock_start(dp_clk);
+  clock_start(emu->cpu->clock);
   while (!quit){
+      // execute next instr
+      exec_instr(emu);
+      // poll keyboard events
       while (SDL_PollEvent(&e)){
           if (e.type == SDL_EVENT_QUIT){
               quit = true;
           }
-          if (e.type == SDL_EVENT_KEY_DOWN){
-              quit = true;
-          }
-          if (e.type == SDL_EVENT_MOUSE_BUTTON_DOWN){
-              quit = true;
-          }
       }
+      // handle dp refresh and timers
+      if(clock_exp(dp_clk)) {
+        draw_pixmap(emu);
+        // dec timers
+        dec_timer(emu->cpu->s_timer);
+        dec_timer(emu->cpu->d_timer);
+        clock_start(dp_clk);
+      }
+      clock_sync(emu->cpu->clock);
   }
+  free(dp_clk);
 }
 
 
@@ -211,6 +306,8 @@ void free_emu(emu_s *emu) {
   free(emu->mem);
   free(emu->cpu->s_timer);
   free(emu->cpu->d_timer);
+  free(emu->cpu->clock);
   free(emu->cpu);
+  display_free(emu->dp);
   free(emu);
 }

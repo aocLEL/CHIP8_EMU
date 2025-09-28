@@ -20,6 +20,8 @@
 
 // timer frequency in hz
 #define TIMER_FREQ    0x3c
+// NS in S
+#define NS_S          1000000000LL
 // clock default freq, 700hz
 #define CLOCK_DEFAULT 0x2bc
 
@@ -37,7 +39,7 @@
 typedef uint16_t cpu_reg16;
 typedef uint16_t instr_t;
 typedef uint8_t  cpu_reg8;
-
+typedef uint8_t* mem_p;
 
 
 
@@ -54,12 +56,17 @@ int     dec_timer(timer_s *tm);
 timer_s *set_timer(timer_s *tm, int val);
 
 
+typedef struct {
+  uint16_t clock_speed; // clock freq
+  uint64_t cycle_duration_ns; // duration of each cycle based on freq
+  uint64_t curr; // curr time slice
+} clock_s;
 
 
 typedef struct {
   timer_s     *d_timer;
   timer_s     *s_timer;
-  uint16_t    clock_speed; // configurable through command line arg, default otherwise
+  clock_s     *clock;
   // regs
   cpu_reg16   pc_r; // program counter
   cpu_reg16   i_r; // index register
@@ -68,9 +75,10 @@ typedef struct {
 
 
 typedef struct {
-  char      *mem_base;
+  mem_p     mem_base;
   uint16_t  sp_off;
 } mem_s;
+
 
 typedef struct {
   cpu_s     *cpu;
