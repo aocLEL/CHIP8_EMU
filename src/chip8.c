@@ -233,15 +233,24 @@ __private unsigned int exec_instr(emu_s *emu) {
 
 // draw pixmap
 __private void draw_pixmap(emu_s *emu) {
-  // get scaled pixel dimensions
-  uint8_t      *pixmap  = emu->dp->pixmap;
-  unsigned int xpix_dim = emu->dp->res_x / CHIP_DPW;
-  unsigned int ypix_dim = emu->dp->res_y / CHIP_DPH;
+  // clear screen
+  if(!SDL_SetRenderDrawColor(emu->dp->hw->rnd, OFF_COLOR_R, OFF_COLOR_G, OFF_COLOR_B, SDL_ALPHA_OPAQUE)) {
+    SDL_Log("Couldn't draw color on screen : %s", SDL_GetError());
+    die("*** EMU GRAPHICS ERROR ***");
+  }
+  if(!SDL_RenderClear(emu->dp->hw->rnd)) {
+    SDL_Log("Couldn't clear the screen : %s", SDL_GetError());
+    die("*** EMU GRAPHICS ERROR ***");
+  }
   // redraw backbuffer
   if(!SDL_SetRenderDrawColor(emu->dp->hw->rnd, ON_COLOR_R, ON_COLOR_G, ON_COLOR_B, SDL_ALPHA_OPAQUE)) {
     SDL_Log("Couldn't set pixel color : %s", SDL_GetError());
     die("*** EMU GRAPHICS ERROR ***");
   }
+  // get scaled pixel dimensions
+  uint8_t      *pixmap  = emu->dp->pixmap;
+  unsigned int xpix_dim = emu->dp->res_x / CHIP_DPW;
+  unsigned int ypix_dim = emu->dp->res_y / CHIP_DPH;
   for(size_t y = 0; y < CHIP_DPH; y++) {
     for(size_t x = 0; x < CHIP_DPW; x++) {
       if(pixmap[PIXMAP_IDX(y, x)]) {
@@ -281,7 +290,13 @@ void emu_loop(emu_s *emu) {
       // poll keyboard events
       while (SDL_PollEvent(&e)){
           if (e.type == SDL_EVENT_QUIT){
+            quit = true;
+          }
+          else if(e.type == SDL_EVENT_KEY_DOWN) {
+            if(e.key.key == SDLK_Q) {
               quit = true;
+              break;
+            }
           }
       }
       // handle dp refresh and timers

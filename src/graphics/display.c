@@ -29,6 +29,10 @@ __private sdl_s *init_sdl(sdl_s **sdl, const char *win_name, unsigned int res_x,
     SDL_Log("Couldn't initialize SDL : %s", SDL_GetError());
     die("*** EMU GRAPHICS ERROR ***");
   }
+  if(!SDL_SetWindowPosition((*sdl)->win, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED)) {
+    SDL_Log("Couldn't center the window : %s", SDL_GetError());
+    die("*** EMU GRAPHICS ERROR ***");
+  }
   return *sdl;
 }
 

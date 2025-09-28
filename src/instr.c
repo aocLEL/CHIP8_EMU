@@ -17,7 +17,6 @@
 // return a symbolic positive value on success
 
 unsigned int instr_clear_screen(emu_s *emu) {
-  puts("Screen clear!!!!!");
   // sets all pixels to black(0)
   memset(emu->dp->pixmap, 0, sizeof(uint8_t) * CHIP_DPH * CHIP_DPW);
   if(!SDL_SetRenderDrawColor(emu->dp->hw->rnd, OFF_COLOR_R, OFF_COLOR_G, OFF_COLOR_B, SDL_ALPHA_OPAQUE)) {
