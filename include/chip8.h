@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include <error.h>
+#include <opt.h>
 #include "graphics/display.h"
 
 #define PROG_MEM_SIZE 0x1000
@@ -13,7 +14,7 @@
 #define NULL_ADDR     0x0
 
 #define STACK_SIZE    0x100
-#define STACK_LBOUND  PROG_MEM_SIZE 
+#define STACK_LBOUND  PROG_UBOUND + 1 
 #define STACK_UBOUND  STACK_LBOUND + STACK_SIZE  
 
 #define MEM_SIZE      PROG_MEM_SIZE + STACK_SIZE
@@ -24,8 +25,12 @@
 #define NS_S          1000000000LL
 // clock default freq, 700hz
 #define CLOCK_DEFAULT 0x2bc
+// default shift behavior (early)
+#define DEFAULT_SHIFT 0x0
 
 #define GPREGS_NUM    0x10
+
+#define FONT_DIM      0x5
 
 // istruction parsing macros
 #define INSTR_OPCODE(x) (((x) >> 12) & 0xf)
@@ -79,19 +84,23 @@ typedef struct {
   uint16_t  sp_off;
 } mem_s;
 
+// emu basic settings(more chip-8 standards exists, this helps configuring the desired one)
 
 typedef struct {
   cpu_s     *cpu;
   mem_s     *mem; // 4kib
   display_s *dp; // stl display handler
+  uint8_t   chipmd;
 } emu_s;
 
 
 // emu funcs
-const emu_s *emu_ctor(emu_s **emu, uint16_t clock_s, const char *win_name, unsigned int res_x, unsigned int res_y, unsigned int ref_rt); 
+const emu_s *emu_ctor(emu_s **emu, uint16_t clock_s, const char *win_name, unsigned int res_x, unsigned int res_y, unsigned int ref_rt, uint8_t chipmd, optval_u *raw_keypad); 
 void        emu_loop(emu_s *emu);
 mem_s       *s_push(mem_s *mem, uint16_t val);
 uint16_t    s_pop(mem_s *mem);
+uint8_t     *st_mem(mem_s *mem, uint16_t addr, const uint8_t *src, uint8_t size);
+uint8_t     *ld_mem(mem_s *mem, uint16_t addr, uint8_t *dest, uint8_t size);
 
 const emu_s *load_rom(emu_s *emu, const char *prog_name);
 void        free_emu(emu_s *emu);

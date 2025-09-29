@@ -36,9 +36,6 @@ uint8_t fontset[] = {
   0xF0, 0x80, 0xF0, 0x80, 0x80  // F
 };
 
-uint8_t keypad[] = {
-
-};
 
 timer_s *init_timer(int init_val, unsigned int sound) {
   timer_s *tm;
@@ -70,11 +67,11 @@ mem_s *s_push(mem_s *mem, uint16_t val) {
 }
 
 uint16_t s_pop(mem_s *mem) {
+  mem->sp_off -= 2;
   mem_p sp = mem->mem_base + mem->sp_off;
-  if(mem->sp_off <= STACK_LBOUND) 
+  if(mem->sp_off < STACK_LBOUND) 
     die("*** Stack underflow *** ABORT!!!");
   uint16_t val = *((uint16_t *)sp);
-  mem->sp_off -= 2;
   return val;
 }
 
@@ -93,6 +90,23 @@ __private mem_s *init_mem(emu_s *emu) {
   memcpy(mem->mem_base + FONT_SADDR, fontset, sizeof(fontset));
   emu->mem = mem;
   return mem; 
+}
+
+
+uint8_t *st_mem(mem_s *mem, uint16_t addr, const uint8_t *src, uint8_t size) {
+  if(size + addr >= MEM_SIZE)
+    die("*** Segmentation Fault ***");
+  memcpy(mem->mem_base + addr, src, size);
+  return (uint8_t*)mem->mem_base + addr;
+}
+
+
+
+uint8_t *ld_mem(mem_s *mem, uint16_t addr, uint8_t *dest, uint8_t size) {
+  if(size + addr >= MEM_SIZE)
+    die("*** Segmentation Fault ***");
+  memcpy(dest, mem->mem_base + addr, size);
+  return dest;
 }
 
 
@@ -147,7 +161,7 @@ __private cpu_s *init_cpu(emu_s *emu, uint16_t clock_s) {
   return emu->cpu;
 }
 
-const emu_s *emu_ctor(emu_s **emu, uint16_t clock_s, const char *win_name, unsigned int res_x, unsigned int res_y, unsigned int ref_rt) {
+const emu_s *emu_ctor(emu_s **emu, uint16_t clock_s, const char *win_name, unsigned int res_x, unsigned int res_y, unsigned int ref_rt, uint8_t chipmd, optval_u *raw_keypad) {
   // creating emu object
   if(!(*emu = malloc(sizeof(emu_s)))) 
     die("Memory allocation failed: %s", strerror(errno));
@@ -155,7 +169,8 @@ const emu_s *emu_ctor(emu_s **emu, uint16_t clock_s, const char *win_name, unsig
   init_mem(*emu);
   // remember to optimize for page alignment and other
   // init display
-  init_display(&(*emu)->dp, win_name, res_x, res_y, ref_rt);
+  init_display(&(*emu)->dp, win_name, res_x, res_y, ref_rt, raw_keypad);
+  (*emu)->chipmd = chipmd;
   return *emu;
 }
 
@@ -195,6 +210,7 @@ __private instr_t fetch_instr(emu_s *emu) {
 __private unsigned int exec_instr(emu_s *emu) {
  // fetch
  instr_t instr = fetch_instr(emu);
+ printf("Executing instr %X at addr 0x%x\n", instr, emu->cpu->pc_r - 2);
  cpu_reg8 opcode = INSTR_OPCODE(instr);
  switch(opcode) {
    case 0x0:
@@ -212,13 +228,13 @@ __private unsigned int exec_instr(emu_s *emu) {
       call_sub(emu, INSTR_NNN(instr));
       break;
    case 0x3:
-      skip_eq(emu, INSTR_X(instr), INSTR_NN(instr));
+      skip_eq(emu, emu->cpu->gp_r[INSTR_X(instr)], INSTR_NN(instr));
       break;
    case 0x4:
-      skip_neq(emu, INSTR_X(instr), INSTR_NN(instr));
+      skip_neq(emu, emu->cpu->gp_r[INSTR_X(instr)], INSTR_NN(instr));
       break;
    case 0x5:
-      skip_eq(emu, INSTR_X(instr), INSTR_Y(instr));
+      skip_eq(emu, emu->cpu->gp_r[INSTR_X(instr)], emu->cpu->gp_r[INSTR_Y(instr)]);
       break;
    case 0x6:
       // set register vx at NN value
@@ -248,21 +264,75 @@ __private unsigned int exec_instr(emu_s *emu) {
         case 0x5:
            sub_rr(emu, INSTR_X(instr), INSTR_Y(instr));
            break;
+        case 0x6:
+           reg_rshift(emu, INSTR_X(instr), INSTR_Y(instr));
+           break;
         case 0x7:
            sub_rrrev(emu, INSTR_X(instr), INSTR_Y(instr));
            break;
+        case 0xE:
+           reg_lshift(emu, INSTR_X(instr), INSTR_Y(instr));
+           break;
       }
+      break;
    case 0x9:
       // set register vx at NN value
-      skip_neq(emu, INSTR_X(instr), INSTR_Y(instr));
+      skip_neq(emu, emu->cpu->gp_r[INSTR_X(instr)], emu->cpu->gp_r[INSTR_Y(instr)]);
       break;
    case 0xA:
       // set ix to NNN
       set_ixreg(emu, INSTR_NNN(instr));
       break;
+   case 0xB:
+      instr_jmpoff(emu, INSTR_X(instr), INSTR_NNN(instr));
+      break;
+   case 0xC:
+      instr_rand(emu, INSTR_X(instr), INSTR_NN(instr));
+      break;
    case 0xD:
       // draw on screen
       draw_dp(emu, INSTR_X(instr), INSTR_Y(instr), INSTR_N(instr));
+      break;
+   case 0xE:
+      switch(INSTR_NN(instr)) {
+        case 0x9E:
+          instr_skkeypr(emu, INSTR_X(instr));
+          break;
+        case 0xA1:
+          instr_skkeynpr(emu, INSTR_X(instr));
+          break;
+      }
+      break;
+   case 0xF:
+      switch(INSTR_NN(instr)) {
+        case 0x07:
+          instr_setvxdt(emu, INSTR_X(instr));
+          break;
+        case 0x0A:
+          instr_getkey(emu, INSTR_X(instr));
+          break;
+        case 0x15:
+          instr_setdt(emu, INSTR_X(instr));
+          break;
+        case 0x18:
+          instr_setst(emu, INSTR_X(instr));
+          break;
+        case 0x1E:
+          instr_addvxix(emu, INSTR_X(instr));
+          break;
+        case 0x29:
+          instr_fontchar(emu, INSTR_X(instr));
+          break;
+        case 0x33:
+          instr_bindec(emu, INSTR_X(instr));
+          break;
+        case 0x55:
+          instr_stmem(emu, INSTR_X(instr));
+          break;
+        case 0x65:
+          instr_ldmem(emu, INSTR_X(instr));
+          break;
+      }
       break;
    default:
       die("*** EMU ERROR: UNRECOGNIZED INSTRUCTION %hu ***", instr);
@@ -313,10 +383,33 @@ __private void draw_pixmap(emu_s *emu) {
 // cpu clock emulation
 
 
+__private void poll_events(emu_s *emu, uint8_t *quit) {
+  SDL_Event e;
+  while (SDL_PollEvent(&e)){
+    if(e.type == SDL_EVENT_QUIT)
+      *quit = true;
+    else if(e.type == SDL_EVENT_KEY_DOWN) {
+      if(e.key.key == SDLK_ESCAPE) {
+        *quit = true;
+        break;
+      }
+      int8_t idx = get_keymap(e.key.key);
+      if(idx != -1)
+        emu->dp->keypad[idx].pressed = 1;
+    }
+    else if(e.type == SDL_EVENT_KEY_UP) {
+      int8_t idx = get_keymap(e.key.key);
+      if(idx != -1)
+        emu->dp->keypad[idx].pressed = 0;
+    }
+  }
+}
+
+
+
 // remove unused
 void emu_loop(emu_s *emu) {
-  SDL_Event e;
-  bool quit = false;
+  uint8_t quit = false;
   SDL_SetRenderDrawColor(emu->dp->hw->rnd, 0, 0, 0, 255);
   SDL_RenderClear(emu->dp->hw->rnd);
   SDL_RenderPresent(emu->dp->hw->rnd);
@@ -330,18 +423,7 @@ void emu_loop(emu_s *emu) {
       // execute next instr
       exec_instr(emu);
       // poll keyboard events
-      while (SDL_PollEvent(&e)){
-          if (e.type == SDL_EVENT_QUIT){
-            quit = true;
-          }
-          else if(e.type == SDL_EVENT_KEY_DOWN) {
-            if(e.key.key == SDLK_Q) {
-              quit = true;
-              break;
-            }
-          }
-      }
-      // handle dp refresh and timers
+      poll_events(emu, &quit);
       if(clock_exp(dp_clk)) {
         draw_pixmap(emu);
         // dec timers

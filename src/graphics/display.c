@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <ctype.h>
 #include <errno.h>
 #include <graphics/display.h>
 #include <error.h>
@@ -11,6 +12,11 @@
 #define SDL_APP_ID       ""
 #define SDL_APP_VERSION  VERSION_STR 
 
+
+// keymap structure, maps from key scancode to chip8 key structure in keypad array
+int8_t        keymap[INT8_MAX + 1];
+// default keypad
+const uint8_t def_keypad[CHIP_KEYPAD_SIZE] = {'1', '2', '3', '4', 'q', 'w', 'e', 'r', 'a', 's', 'd', 'f', 'z', 'x', 'c', 'v'};
 
 
 __private sdl_s *init_sdl(sdl_s **sdl, const char *win_name, unsigned int res_x, unsigned int res_y) {
@@ -36,7 +42,37 @@ __private sdl_s *init_sdl(sdl_s **sdl, const char *win_name, unsigned int res_x,
   return *sdl;
 }
 
-display_s *init_display(display_s **dp, const char *win_name, unsigned int res_x, unsigned int res_y, unsigned int ref_rt) {
+
+__private void set_keypad(chip8_key_s *kp, optval_u *rkp) {
+  memset(keymap, -1, INT8_MAX + 1);
+  if(rkp) {
+   // set to user defined keys 
+   for(size_t i = 0; i < CHIP_KEYPAD_SIZE; i++) {
+     uint8_t key = rkp[i].str[0];
+     if(!isalnum(key)) {
+       // this have to be replaced by emu_die !!!
+        fprintf(stderr, "Keypad keys have to be alphanumeric (%c is not)!!!\n", key);
+        exit(EXIT_FAILURE);
+     }
+     kp[i].keycode = key;
+     kp[i].pressed = 0;
+     keymap[key] = i;
+   }
+  }
+  else {
+    for(size_t i = 0; i < CHIP_KEYPAD_SIZE; i++) {
+      kp[i].keycode = def_keypad[i];
+      kp[i].pressed = 0;
+      keymap[kp[i].keycode] = i;
+    }
+  }
+}
+
+inline int8_t get_keymap(int8_t idx) {
+  return keymap[idx];
+}
+
+display_s *init_display(display_s **dp, const char *win_name, unsigned int res_x, unsigned int res_y, unsigned int ref_rt, optval_u *raw_keypad) {
   if(!(*dp = malloc(sizeof(display_s)))) 
     die("Memory allocation failed: %s", strerror(errno));
   init_sdl(&(*dp)->hw, win_name, res_x, res_y);
@@ -48,6 +84,10 @@ display_s *init_display(display_s **dp, const char *win_name, unsigned int res_x
   if(!((*dp)->pixmap = malloc(pixmap_dim)))
     die("Memory allocation failed: %s", strerror(errno));
   memset((*dp)->pixmap, 0,  pixmap_dim);
+  // setting keypad
+  if(!((*dp)->keypad = malloc(sizeof(chip8_key_s) * CHIP_KEYPAD_SIZE))) 
+    die("Memory allocation failed: %s", strerror(errno));
+  set_keypad((*dp)->keypad, raw_keypad);
   return *dp;
 }
 
@@ -61,6 +101,7 @@ void display_free(display_s *dp) {
   SDL_DestroyWindow(dp->hw->win);
   SDL_Quit();
   free(dp->pixmap);
+  free(dp->keypad);
   free(dp->hw);
   free(dp);
 }
