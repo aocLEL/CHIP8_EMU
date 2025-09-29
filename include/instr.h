@@ -8,6 +8,7 @@
 #define INSTR_JUMP                0x1000
 #define INSTR_SETVX               0x6000
 #define INSTR_ADDVX               0x7000
+#define INSTR_RETURN_SUB          0x00EE
 #define INSTR_SETIX               0xA000
 #define INSTR_DRAW                0xD000
 
@@ -28,7 +29,22 @@ unsigned int instr_clear_screen(emu_s *emu);
 unsigned int instr_jmp(emu_s *emu, chip_arg16 jmp_addr);
 unsigned int set_vreg(emu_s *emu, chip_arg8 x_reg, chip_arg8 val);
 unsigned int add_vreg(emu_s *emu, chip_arg8 x_reg, chip_arg8 val);
+unsigned int add_rrc(emu_s *emu, chip_arg8 x_reg, chip_arg8 y_reg);
+unsigned int sub_rr(emu_s *emu, chip_arg8 x_reg, chip_arg8 y_reg);
+unsigned int sub_rrrev(emu_s *emu, chip_arg8 x_reg, chip_arg8 y_reg);
+unsigned int set_xy(emu_s *emu, chip_arg8 x_reg, chip_arg8 y_reg);
+unsigned int call_sub(emu_s *emu, chip_arg16 sub_addr);
+unsigned int ret_sub(emu_s *emu);
 unsigned int set_ixreg(emu_s *emu, chip_arg16 val);
 unsigned int draw_dp(emu_s *emu, chip_arg8 x_reg, chip_arg8 y_reg, unsigned int n_pixel);
+
+// skip if
+unsigned int skip_eq(emu_s *emu, chip_arg16 op1, chip_arg16 op2);
+unsigned int skip_neq(emu_s *emu, chip_arg16 op1, chip_arg16 op2);
+
+//logical
+unsigned int bitwise_or(emu_s *emu, chip_arg8 x_reg, chip_arg8 y_reg);
+unsigned int bitwise_and(emu_s *emu, chip_arg8 x_reg, chip_arg8 y_reg);
+unsigned int bitwise_xor(emu_s *emu, chip_arg8 x_reg, chip_arg8 y_reg);
 
 #endif

@@ -201,10 +201,24 @@ __private unsigned int exec_instr(emu_s *emu) {
       // clear screen
       if(instr == INSTR_CLEAR_SCREEN)
         instr_clear_screen(emu);
+      else if(instr == INSTR_RETURN_SUB)
+        ret_sub(emu);
       break;
    case 0x1:
       // jump
       instr_jmp(emu,  INSTR_NNN(instr));
+      break;
+   case 0x2:
+      call_sub(emu, INSTR_NNN(instr));
+      break;
+   case 0x3:
+      skip_eq(emu, INSTR_X(instr), INSTR_NN(instr));
+      break;
+   case 0x4:
+      skip_neq(emu, INSTR_X(instr), INSTR_NN(instr));
+      break;
+   case 0x5:
+      skip_eq(emu, INSTR_X(instr), INSTR_Y(instr));
       break;
    case 0x6:
       // set register vx at NN value
@@ -213,6 +227,34 @@ __private unsigned int exec_instr(emu_s *emu) {
    case 0x7:
       // add value NN to register vx, needs to modify flag register
       add_vreg(emu, INSTR_X(instr), INSTR_NN(instr));
+      break;
+   case 0x8:
+      switch(INSTR_N(instr)) {
+        case 0x0:
+           set_xy(emu, INSTR_X(instr), INSTR_Y(instr));
+           break;
+        case 0x1:
+           bitwise_or(emu, INSTR_X(instr), INSTR_Y(instr));
+           break;
+        case 0x2:
+           bitwise_and(emu, INSTR_X(instr), INSTR_Y(instr));
+           break;
+        case 0x3:
+           bitwise_xor(emu, INSTR_X(instr), INSTR_Y(instr));
+           break;
+        case 0x4:
+           add_rrc(emu, INSTR_X(instr), INSTR_Y(instr));
+           break;
+        case 0x5:
+           sub_rr(emu, INSTR_X(instr), INSTR_Y(instr));
+           break;
+        case 0x7:
+           sub_rrrev(emu, INSTR_X(instr), INSTR_Y(instr));
+           break;
+      }
+   case 0x9:
+      // set register vx at NN value
+      skip_neq(emu, INSTR_X(instr), INSTR_Y(instr));
       break;
    case 0xA:
       // set ix to NNN

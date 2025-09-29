@@ -42,10 +42,52 @@ unsigned int set_vreg(emu_s *emu, chip_arg8 x_reg, chip_arg8 val) {
   return 1;
 }
 
+unsigned int add_rrc(emu_s *emu, chip_arg8 x_reg, chip_arg8 y_reg) {
+  chip_arg16 res = emu->cpu->gp_r[x_reg] + emu->cpu->gp_r[y_reg];
+  emu->cpu->gp_r[FLAG_REG] = res > 255 ? 1 : 0;
+  emu->cpu->gp_r[x_reg] = (chip_arg8)res;
+  return 1;
+}
+
+unsigned int sub_rr(emu_s *emu, chip_arg8 x_reg, chip_arg8 y_reg) {
+  emu->cpu->gp_r[FLAG_REG] = 1;
+  if(emu->cpu->gp_r[x_reg] < emu->cpu->gp_r[y_reg])
+    emu->cpu->gp_r[FLAG_REG] = 0;
+  emu->cpu->gp_r[x_reg] = emu->cpu->gp_r[x_reg] - emu->cpu->gp_r[y_reg];
+  return 1;
+}
+
+unsigned int sub_rrrev(emu_s *emu, chip_arg8 x_reg, chip_arg8 y_reg) {
+  emu->cpu->gp_r[FLAG_REG] = 1;
+  if(emu->cpu->gp_r[y_reg] < emu->cpu->gp_r[x_reg])
+    emu->cpu->gp_r[FLAG_REG] = 0;
+  emu->cpu->gp_r[x_reg] = emu->cpu->gp_r[y_reg] - emu->cpu->gp_r[x_reg];
+  return 1;
+}
+
 
 unsigned int add_vreg(emu_s *emu, chip_arg8 x_reg, chip_arg8 val) {
   emu->cpu->gp_r[x_reg] = (emu->cpu->gp_r[x_reg] + val) % 0x100;
   return 1; 
+}
+
+unsigned int set_xy(emu_s *emu, chip_arg8 x_reg, chip_arg8 y_reg) {
+  emu->cpu->gp_r[x_reg] = emu->cpu->gp_r[y_reg];
+  return 1;
+}
+
+// remember to protect from invalid memory accesses
+
+unsigned int call_sub(emu_s *emu, chip_arg16 sub_addr) {
+  s_push(emu->mem, emu->cpu->pc_r);
+  emu->cpu->pc_r = sub_addr;
+  return 1;
+}
+
+
+unsigned int ret_sub(emu_s *emu) {
+  emu->cpu->pc_r = s_pop(emu->mem);
+  return 1;
 }
 
 
@@ -55,6 +97,35 @@ unsigned int set_ixreg(emu_s *emu, chip_arg16 val) {
 }
 
 
+// skip if
+unsigned int skip_eq(emu_s *emu, chip_arg16 op1, chip_arg16 op2) {
+  if(op1 == op2)
+    emu->cpu->pc_r += 2;
+  return 1;
+}
+
+unsigned int skip_neq(emu_s *emu, chip_arg16 op1, chip_arg16 op2) {
+  if(op1 != op2)
+    emu->cpu->pc_r += 2;
+  return 1;
+}
+
+
+// logical
+unsigned int bitwise_or(emu_s *emu, chip_arg8 x_reg, chip_arg8 y_reg) {
+  emu->cpu->gp_r[x_reg] = emu->cpu->gp_r[x_reg] | emu->cpu->gp_r[y_reg];
+  return 1;
+}
+
+unsigned int bitwise_and(emu_s *emu, chip_arg8 x_reg, chip_arg8 y_reg) {
+  emu->cpu->gp_r[x_reg] = emu->cpu->gp_r[x_reg] & emu->cpu->gp_r[y_reg];
+  return 1;
+}
+
+unsigned int bitwise_xor(emu_s *emu, chip_arg8 x_reg, chip_arg8 y_reg) {
+  emu->cpu->gp_r[x_reg] = emu->cpu->gp_r[x_reg] ^ emu->cpu->gp_r[y_reg];
+  return 1;
+}
 
 // get info about pixel at coordinates x and y
 __private inline uint8_t get_pix_mode(uint8_t *pixmap, unsigned int x_c, unsigned int y_c) {

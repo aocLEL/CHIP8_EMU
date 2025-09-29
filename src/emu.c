@@ -10,7 +10,7 @@
 int main(int argc, char **argv) {
   char *prog_name = NULL;
   __argv option_s* opt = argv_parse(PROG_OPT, argc, argv, &prog_name); // NOLINT
-	if( opt[O_h].set ) argv_usage(opt, argv[0]);
+	if( opt[O_H].set ) argv_usage(opt, argv[0]);
   if(!prog_name) {
     puts("No ROM given!! try again");
     exit(EXIT_FAILURE);
