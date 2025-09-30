@@ -36,7 +36,7 @@ typedef struct option{
 
 #define __argv __cleanup(argv_cleanup)
 
-option_s* argv_parse(option_s* opt, int argc, char** argv, char **prog_name);
+option_s* argv_parse(option_s* opt, int argc, char** argv, char *prog_name);
 option_s* argv_dtor(option_s* opt);
 void argv_cleanup(void* ppopt);
 void argv_usage(option_s* opt, const char* argv0);

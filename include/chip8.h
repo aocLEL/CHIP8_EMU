@@ -85,7 +85,6 @@ typedef struct {
   uint16_t  *spf;
 } mem_s;
 
-// emu basic settings(more chip-8 standards exists, this helps configuring the desired one)
 
 typedef struct {
   cpu_s     *cpu;
@@ -98,10 +97,10 @@ typedef struct {
 // emu funcs
 const emu_s *emu_ctor(emu_s **emu, uint16_t clock_s, const char *win_name, unsigned int res_x, unsigned int res_y, unsigned int ref_rt, uint8_t chipmd, optval_u *raw_keypad); 
 void        emu_loop(emu_s *emu);
-mem_s       *s_push(mem_s *mem, uint16_t val);
-uint16_t    s_pop(mem_s *mem);
-uint8_t     *st_mem(mem_s *mem, uint16_t addr, const uint8_t *src, uint8_t size);
-uint8_t     *ld_mem(mem_s *mem, uint16_t addr, uint8_t *dest, uint8_t size);
+mem_s       *s_push(emu_s *emu, uint16_t val);
+uint16_t    s_pop(emu_s *emu);
+uint8_t     *st_mem(emu_s *emu, uint16_t addr, const uint8_t *src, uint8_t size);
+uint8_t     *ld_mem(emu_s *emu, uint16_t addr, uint8_t *dest, uint8_t size);
 
 const emu_s *load_rom(emu_s *emu, const char *prog_name);
 void        free_emu(emu_s *emu);

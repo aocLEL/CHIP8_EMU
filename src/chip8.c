@@ -57,13 +57,15 @@ inline int dec_timer(timer_s *tm) {
 }
 
 
-mem_s *s_push(mem_s *mem, uint16_t val) {
+
+mem_s *s_push(emu_s *emu, uint16_t val) {
+  mem_s *mem = emu->mem;
   if((uintptr_t)mem->sp < ((uintptr_t)mem->mem_base + STACK_UBOUND)) {
     *mem->sp = val;
     mem->sp++;
     return mem;
   } 
-  die("*** Stack Overflow *** ABORT!!!");
+  emu_die(emu, "*** Stack Overflow *** ABORT!!!");
 /*
   printf("Pushing to stack addr 0x%x with base %p |  val %x\n", mem->sp_off, mem->mem_base, val);
   volatile mem_p sp = mem->mem_base + mem->sp_off;
@@ -77,10 +79,11 @@ mem_s *s_push(mem_s *mem, uint16_t val) {
   */
 }
 
-uint16_t s_pop(mem_s *mem) {
+uint16_t s_pop(emu_s *emu) {
+  mem_s *mem = emu->mem;
   if((uintptr_t)mem->sp > (uintptr_t)(mem->mem_base + STACK_LBOUND))
     return *(mem->sp--);
-  die("*** Stack underflow *** ABORT!!!");
+  emu_die(emu, "*** Stack underflow *** ABORT!!!");
 
   /*
   die("*** Stack underflow *** ABORT!!!");
@@ -117,18 +120,20 @@ __private mem_s *init_mem(emu_s *emu) {
 }
 
 
-uint8_t *st_mem(mem_s *mem, uint16_t addr, const uint8_t *src, uint8_t size) {
+uint8_t *st_mem(emu_s *emu, uint16_t addr, const uint8_t *src, uint8_t size) {
+  mem_s *mem = emu->mem;
   if(size + addr >= MEM_SIZE)
-    die("*** Segmentation Fault ***");
+    emu_die(emu, "*** Segmentation Fault ***");
   memcpy(mem->mem_base + addr, src, size);
   return (uint8_t*)mem->mem_base + addr;
 }
 
 
 
-uint8_t *ld_mem(mem_s *mem, uint16_t addr, uint8_t *dest, uint8_t size) {
+uint8_t *ld_mem(emu_s *emu, uint16_t addr, uint8_t *dest, uint8_t size) {
+  mem_s *mem = emu->mem;
   if(size + addr >= MEM_SIZE)
-    die("*** Segmentation Fault ***");
+    emu_die(emu, "*** Segmentation Fault ***");
   memcpy(dest, mem->mem_base + addr, size);
   return dest;
 }
@@ -191,7 +196,6 @@ const emu_s *emu_ctor(emu_s **emu, uint16_t clock_s, const char *win_name, unsig
     die("Memory allocation failed: %s", strerror(errno));
   init_cpu(*emu, clock_s);
   init_mem(*emu);
-  // remember to optimize for page alignment and other
   // init display
   init_display(&(*emu)->dp, win_name, res_x, res_y, ref_rt, raw_keypad);
   (*emu)->chipmd = chipmd;
@@ -204,15 +208,18 @@ const emu_s *load_rom(emu_s *emu, const char *prog_name) {
   int fd;
   if((fd = open(prog_name, O_RDONLY)) == -1) {
     fprintf(stderr, "Can't open specified ROM: %s\n", strerror(errno));
+    free_emu(emu);
     exit(EXIT_FAILURE);
   }
   mem_p prog_mem = (mem_p)(emu->mem->mem_base + PROG_ENTRY);
   if((read(fd, prog_mem, PROG_MEM_SIZE - PROG_ENTRY)) == -1) {
     fprintf(stderr, "Can't load rom into memory: %s\n", strerror(errno));
+    free_emu(emu);
     exit(EXIT_FAILURE);
   }
   if(close(fd) == -1) {
     fprintf(stderr, "Error while closing file: %s\n", strerror(errno));
+    free_emu(emu);
     exit(EXIT_FAILURE);
   }
   // set pc to first instruction
@@ -360,11 +367,8 @@ __private unsigned int exec_instr(emu_s *emu) {
       }
       break;
    default:
-      die("*** EMU ERROR: UNRECOGNIZED INSTRUCTION %hu ***", instr);
+      emu_die(emu, "*** EMU ERROR: UNRECOGNIZED INSTRUCTION %hu ***", instr);
  }
- // decode
- // execute
- printf("end stack val: 0x%x\n", *((uint16_t*)(emu->mem->spf)));
  return 1;
 }
 
@@ -374,16 +378,16 @@ __private void draw_pixmap(emu_s *emu) {
   // clear screen
   if(!SDL_SetRenderDrawColor(emu->dp->hw->rnd, OFF_COLOR_R, OFF_COLOR_G, OFF_COLOR_B, SDL_ALPHA_OPAQUE)) {
     SDL_Log("Couldn't draw color on screen : %s", SDL_GetError());
-    die("*** EMU GRAPHICS ERROR ***");
+    emu_die(emu, "*** EMU GRAPHICS ERROR ***");
   }
   if(!SDL_RenderClear(emu->dp->hw->rnd)) {
     SDL_Log("Couldn't clear the screen : %s", SDL_GetError());
-    die("*** EMU GRAPHICS ERROR ***");
+    emu_die(emu, "*** EMU GRAPHICS ERROR ***");
   }
   // redraw backbuffer
   if(!SDL_SetRenderDrawColor(emu->dp->hw->rnd, ON_COLOR_R, ON_COLOR_G, ON_COLOR_B, SDL_ALPHA_OPAQUE)) {
     SDL_Log("Couldn't set pixel color : %s", SDL_GetError());
-    die("*** EMU GRAPHICS ERROR ***");
+    emu_die(emu, "*** EMU GRAPHICS ERROR ***");
   }
   printf("after sdl inits stack val: 0x%x\n", *((uint16_t*)(emu->mem->spf)));
   // get scaled pixel dimensions
@@ -397,7 +401,7 @@ __private void draw_pixmap(emu_s *emu) {
         SDL_FRect rect = {x * xpix_dim, y * ypix_dim, xpix_dim, ypix_dim};
         if(!SDL_RenderFillRect(emu->dp->hw->rnd, &rect)) {
           SDL_Log("Couldn't draw pixel : %s", SDL_GetError());
-          die("*** EMU GRAPHICS ERROR ***");
+          emu_die(emu, "*** EMU GRAPHICS ERROR ***");
         }
         printf("after sdl fillrect stack val: 0x%x\n", *((uint16_t*)(emu->mem->spf)));
       }
@@ -407,7 +411,7 @@ __private void draw_pixmap(emu_s *emu) {
   printf("before drawpixmap end stack val: 0x%x\n", *((uint16_t*)(emu->mem->spf)));
   if(!SDL_RenderPresent(emu->dp->hw->rnd)) {
     SDL_Log("Couldn't present current renderer backbuffer : %s", SDL_GetError());
-    die("*** EMU GRAPHICS ERROR ***");
+    emu_die(emu, "*** EMU GRAPHICS ERROR ***");
   }
   printf("after drawpixmap end stack val: 0x%x\n", *((uint16_t*)(emu->mem->spf)));
 }
@@ -474,14 +478,24 @@ void emu_loop(emu_s *emu) {
 
 
 
-
 void free_emu(emu_s *emu) {
-  free(emu->mem->mem_base);
-  free(emu->mem);
-  free(emu->cpu->s_timer);
-  free(emu->cpu->d_timer);
-  free(emu->cpu->clock);
-  free(emu->cpu);
-  display_free(emu->dp);
-  free(emu);
+  if(emu) {
+    if(emu->mem) {
+      if(emu->mem->mem_base)
+        free(emu->mem->mem_base);
+      free(emu->mem);
+    }
+    if(emu->cpu) {
+      if(emu->cpu->s_timer)
+        free(emu->cpu->s_timer);
+      if(emu->cpu->d_timer)
+        free(emu->cpu->d_timer);
+      if(emu->cpu->clock)
+        free(emu->cpu->clock);
+      free(emu->cpu);
+    }
+    if(emu->dp)
+      display_free(emu->dp);
+    free(emu);
+  }
 }
