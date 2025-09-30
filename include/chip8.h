@@ -8,16 +8,16 @@
 
 #define PROG_MEM_SIZE 0x1000
 #define PROG_ENTRY    0x200
-#define PROG_UBOUND   PROG_ENTRY + 0xFFF
+#define PROG_UBOUND   (PROG_ENTRY + 0xFFF)
 #define FONT_SADDR    0x50
 #define FONT_EADDR    0x9f
 #define NULL_ADDR     0x0
 
 #define STACK_SIZE    0x100
-#define STACK_LBOUND  PROG_UBOUND + 1 
-#define STACK_UBOUND  STACK_LBOUND + STACK_SIZE  
+#define STACK_LBOUND  (PROG_UBOUND + 1) 
+#define STACK_UBOUND  (STACK_LBOUND + STACK_SIZE)  
 
-#define MEM_SIZE      PROG_MEM_SIZE + STACK_SIZE
+#define MEM_SIZE      (PROG_MEM_SIZE + STACK_SIZE)
 
 // timer frequency in hz
 #define TIMER_FREQ    0x3c
@@ -81,7 +81,8 @@ typedef struct {
 
 typedef struct {
   mem_p     mem_base;
-  uint16_t  sp_off;
+  uint16_t  *sp;
+  uint16_t  *spf;
 } mem_s;
 
 // emu basic settings(more chip-8 standards exists, this helps configuring the desired one)

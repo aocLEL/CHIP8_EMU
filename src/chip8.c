@@ -58,21 +58,42 @@ inline int dec_timer(timer_s *tm) {
 
 
 mem_s *s_push(mem_s *mem, uint16_t val) {
-  mem_p sp = mem->mem_base + mem->sp_off;
-  if(mem->sp_off >= STACK_UBOUND)
+  if((uintptr_t)mem->sp < ((uintptr_t)mem->mem_base + STACK_UBOUND)) {
+    *mem->sp = val;
+    mem->sp++;
+    return mem;
+  } 
+  die("*** Stack Overflow *** ABORT!!!");
+/*
+  printf("Pushing to stack addr 0x%x with base %p |  val %x\n", mem->sp_off, mem->mem_base, val);
+  volatile mem_p sp = mem->mem_base + mem->sp_off;
+  printf("MEMP SP PUSH: %p\n", sp);
+  if(mem->sp_off > STACK_UBOUND)
     die("*** Stack Overflow *** ABORT!!!");
   memcpy(sp, &val, 2);
+  printf("Push check: 0x%x\n", *((uint16_t*)sp));
   mem->sp_off += 2;
   return mem;
+  */
 }
 
 uint16_t s_pop(mem_s *mem) {
+  if((uintptr_t)mem->sp > (uintptr_t)(mem->mem_base + STACK_LBOUND))
+    return *(mem->sp--);
+  die("*** Stack underflow *** ABORT!!!");
+
+  /*
+  die("*** Stack underflow *** ABORT!!!");
   mem->sp_off -= 2;
-  mem_p sp = mem->mem_base + mem->sp_off;
+  printf("Popping from stack addr 0x%x with base %p\n", mem->sp_off, mem->mem_base);
+  volatile mem_p sp = mem->mem_base + mem->sp_off;
+  printf("MEMP SP POP: %p\n", sp);
   if(mem->sp_off < STACK_LBOUND) 
     die("*** Stack underflow *** ABORT!!!");
-  uint16_t val = *((uint16_t *)sp);
+  uint16_t val = 0;
+  memcpy(&val, sp, 2);
   return val;
+  */
 }
 
 
@@ -81,10 +102,13 @@ __private mem_s *init_mem(emu_s *emu) {
   if(!(mem = malloc(sizeof(mem_s))))
     die("Memory allocation failed: %s", strerror(errno));
   // allocating virtual memory space and setting sp
-  if(!(mem->mem_base = malloc(sizeof(unsigned char) * MEM_SIZE)))
+  if(!(mem->mem_base = malloc(sizeof(char) * MEM_SIZE + 1)))
     die("Memory allocation failed: %s", strerror(errno));
   memset(mem->mem_base, 0, sizeof(unsigned char) * MEM_SIZE);
-  mem->sp_off = STACK_LBOUND;
+  // align stack to 16bit
+  unsigned unaligned = (uintptr_t)(mem->mem_base+STACK_LBOUND) & 1;
+  mem->sp = (uint16_t*)(mem->mem_base + STACK_LBOUND + unaligned);
+  mem->spf = mem->sp;
   // loading fontset
   assert(FONT_SADDR + sizeof(fontset) - 1 == FONT_EADDR);
   memcpy(mem->mem_base + FONT_SADDR, fontset, sizeof(fontset));
@@ -182,8 +206,8 @@ const emu_s *load_rom(emu_s *emu, const char *prog_name) {
     fprintf(stderr, "Can't open specified ROM: %s\n", strerror(errno));
     exit(EXIT_FAILURE);
   }
-  mem_p prog_mem = emu->mem->mem_base + PROG_ENTRY;
-  if((read(fd, prog_mem, PROG_MEM_SIZE)) == -1) {
+  mem_p prog_mem = (mem_p)(emu->mem->mem_base + PROG_ENTRY);
+  if((read(fd, prog_mem, PROG_MEM_SIZE - PROG_ENTRY)) == -1) {
     fprintf(stderr, "Can't load rom into memory: %s\n", strerror(errno));
     exit(EXIT_FAILURE);
   }
@@ -210,7 +234,8 @@ __private instr_t fetch_instr(emu_s *emu) {
 __private unsigned int exec_instr(emu_s *emu) {
  // fetch
  instr_t instr = fetch_instr(emu);
- printf("Executing instr %X at addr 0x%x\n", instr, emu->cpu->pc_r - 2);
+ printf("Executing instr %.4X at addr 0x%x\n", instr, emu->cpu->pc_r - 2);
+ printf("start stack val: 0x%x\n", *((uint16_t*)(emu->mem->spf)));
  cpu_reg8 opcode = INSTR_OPCODE(instr);
  switch(opcode) {
    case 0x0:
@@ -339,6 +364,7 @@ __private unsigned int exec_instr(emu_s *emu) {
  }
  // decode
  // execute
+ printf("end stack val: 0x%x\n", *((uint16_t*)(emu->mem->spf)));
  return 1;
 }
 
@@ -359,10 +385,12 @@ __private void draw_pixmap(emu_s *emu) {
     SDL_Log("Couldn't set pixel color : %s", SDL_GetError());
     die("*** EMU GRAPHICS ERROR ***");
   }
+  printf("after sdl inits stack val: 0x%x\n", *((uint16_t*)(emu->mem->spf)));
   // get scaled pixel dimensions
   uint8_t      *pixmap  = emu->dp->pixmap;
   unsigned int xpix_dim = emu->dp->res_x / CHIP_DPW;
   unsigned int ypix_dim = emu->dp->res_y / CHIP_DPH;
+  printf("after sdl dim checks stack val: 0x%x\n", *((uint16_t*)(emu->mem->spf)));
   for(size_t y = 0; y < CHIP_DPH; y++) {
     for(size_t x = 0; x < CHIP_DPW; x++) {
       if(pixmap[PIXMAP_IDX(y, x)]) {
@@ -371,13 +399,17 @@ __private void draw_pixmap(emu_s *emu) {
           SDL_Log("Couldn't draw pixel : %s", SDL_GetError());
           die("*** EMU GRAPHICS ERROR ***");
         }
+        printf("after sdl fillrect stack val: 0x%x\n", *((uint16_t*)(emu->mem->spf)));
       }
     }
   }
+
+  printf("before drawpixmap end stack val: 0x%x\n", *((uint16_t*)(emu->mem->spf)));
   if(!SDL_RenderPresent(emu->dp->hw->rnd)) {
     SDL_Log("Couldn't present current renderer backbuffer : %s", SDL_GetError());
     die("*** EMU GRAPHICS ERROR ***");
   }
+  printf("after drawpixmap end stack val: 0x%x\n", *((uint16_t*)(emu->mem->spf)));
 }
 
 // cpu clock emulation
@@ -403,6 +435,7 @@ __private void poll_events(emu_s *emu, uint8_t *quit) {
         emu->dp->keypad[idx].pressed = 0;
     }
   }
+  printf("after poll events stack val: 0x%x\n", *((uint16_t*)(emu->mem->spf)));
 }
 
 
@@ -426,11 +459,13 @@ void emu_loop(emu_s *emu) {
       poll_events(emu, &quit);
       if(clock_exp(dp_clk)) {
         draw_pixmap(emu);
+        printf("after draw pixmap clock exp stack val: 0x%x\n", *((uint16_t*)(emu->mem->spf)));
         // dec timers
         dec_timer(emu->cpu->s_timer);
         dec_timer(emu->cpu->d_timer);
         clock_start(dp_clk);
       }
+      printf("after clock exp if stack val: 0x%x\n", *((uint16_t*)(emu->mem->spf)));
       clock_sync(emu->cpu->clock);
   }
   free(dp_clk);

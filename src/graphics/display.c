@@ -20,7 +20,12 @@ const uint8_t def_keypad[CHIP_KEYPAD_SIZE] = {'1', '2', '3', '4', 'q', 'w', 'e',
 
 
 __private sdl_s *init_sdl(sdl_s **sdl, const char *win_name, unsigned int res_x, unsigned int res_y) {
-  SDL_SetAppMetadata(SDL_APP_NAME, SDL_APP_VERSION, SDL_APP_ID); //NOLINT
+  /*
+  if(!SDL_SetAppMetadata(SDL_APP_NAME, SDL_APP_VERSION, SDL_APP_ID)) {
+    SDL_Log("Couldn't initialize SDL metadatas: %s", SDL_GetError());
+    die("*** EMU GRAPHICS ERROR ***");
+  }
+  */
   if(!(*sdl = malloc(sizeof(sdl_s)))) 
     die("Memory allocation failed: %s", strerror(errno));
   // init subsystems
