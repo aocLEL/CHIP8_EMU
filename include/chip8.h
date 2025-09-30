@@ -8,13 +8,12 @@
 
 #define PROG_MEM_SIZE 0x1000
 #define PROG_ENTRY    0x200
-#define PROG_UBOUND   (PROG_ENTRY + 0xFFF)
 #define FONT_SADDR    0x50
 #define FONT_EADDR    0x9f
 #define NULL_ADDR     0x0
 
 #define STACK_SIZE    0x100
-#define STACK_LBOUND  (PROG_UBOUND + 1) 
+#define STACK_LBOUND  PROG_MEM_SIZE 
 #define STACK_UBOUND  (STACK_LBOUND + STACK_SIZE)  
 
 #define MEM_SIZE      (PROG_MEM_SIZE + STACK_SIZE)

@@ -81,7 +81,7 @@ mem_s *s_push(emu_s *emu, uint16_t val) {
 
 uint16_t s_pop(emu_s *emu) {
   mem_s *mem = emu->mem;
-  if((uintptr_t)mem->sp > (uintptr_t)(mem->mem_base + STACK_LBOUND))
+  if((uintptr_t)mem->sp >= (uintptr_t)(mem->mem_base + STACK_LBOUND))
     return *(--mem->sp);
   emu_die(emu, "*** Stack underflow *** ABORT!!!");
 
@@ -105,13 +105,13 @@ __private mem_s *init_mem(emu_s *emu) {
   if(!(mem = malloc(sizeof(mem_s))))
     die("Memory allocation failed: %s", strerror(errno));
   // allocating virtual memory space and setting sp
-  if(!(mem->mem_base = malloc(sizeof(char) * MEM_SIZE + 1)))
+  if(!(mem->mem_base = malloc(sizeof(char) * MEM_SIZE)))
     die("Memory allocation failed: %s", strerror(errno));
   memset(mem->mem_base, 0, sizeof(unsigned char) * MEM_SIZE);
   // align stack to 16bit
-  unsigned unaligned = (uintptr_t)(mem->mem_base+STACK_LBOUND) & 1;
+  unsigned unaligned = (uintptr_t)(mem->mem_base + STACK_LBOUND) & 1;
   mem->sp = (uint16_t*)(mem->mem_base + STACK_LBOUND + unaligned);
-  mem->spf = mem->sp;
+  mem->spf = mem->sp; // member to clean UP
   // loading fontset
   assert(FONT_SADDR + sizeof(fontset) - 1 == FONT_EADDR);
   memcpy(mem->mem_base + FONT_SADDR, fontset, sizeof(fontset));
