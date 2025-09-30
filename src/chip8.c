@@ -82,7 +82,7 @@ mem_s *s_push(emu_s *emu, uint16_t val) {
 uint16_t s_pop(emu_s *emu) {
   mem_s *mem = emu->mem;
   if((uintptr_t)mem->sp > (uintptr_t)(mem->mem_base + STACK_LBOUND))
-    return *(mem->sp--);
+    return *(--mem->sp);
   emu_die(emu, "*** Stack underflow *** ABORT!!!");
 
   /*
