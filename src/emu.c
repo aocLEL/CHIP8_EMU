@@ -20,7 +20,6 @@ int main(int argc, char **argv) {
   char full_win_name[FILE_MAX*2];
   sprintf(full_win_name, "%s -- %s", WIN_NAME, prog_name);
   if( opt[O_s].set ) clock_s = (uint16_t)(opt[O_s].value->ui);
-  printf("DBG PROG NAME & CLOCK: %s %hu \n", prog_name, clock_s);
   // setting display info
   unsigned int res_x          = opt[O_w].set ? (unsigned int)(opt[O_w].value->ui) : DEFAULT_REAL_DPW;
   unsigned int res_y          = opt[O_h].set ? (unsigned int)(opt[O_h].value->ui) : DEFAULT_REAL_DPH;
@@ -39,8 +38,6 @@ int main(int argc, char **argv) {
   load_rom(emu, prog_name);  
   // EMU LOOP
   emu_loop(emu);
-
-  // END
   free_emu(emu);
   return 0;
 }

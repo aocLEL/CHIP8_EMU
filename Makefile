@@ -7,11 +7,11 @@ CFLAGS = -Wall \
          -Wno-int-to-pointer-cast\
 		     -MMD \
 		     -MP
-PROD_FLAGS    = -DVERSION_STR="\"0.0.1\"" \
+PROD_FLAGS    = -DVERSION_STR="\"1.0.0\"" \
 							  -DDBG_ENABLE=1
 TEST_FLAGS    = -DDBG_ENABLE=1 \
-						    -DVERSION_STR="\"0.0.1_t\""
-TEST_EN       = 1
+						    -DVERSION_STR="\"1.0.0_t\""
+TEST_EN       = 0
 CARGS         := $(CSTD) $(CFLAGS) $(if $(filter 1, $(TEST_EN)), $(TEST_FLAGS),$(PROD_FLAGS))
 INCLUDE_DIRS  = include/
 DEPS          = sdl3
@@ -33,8 +33,6 @@ TEST_SRC      = emu.c\
                 graphics/display.c\
                 utility/utils.c
 
-#SRC := $(patstub %.c,src/%.c,$(SRC))
-# for each file in SRC or TEST_SRC, create the corrisponding object file in build
 OBJS := $(patsubst %.c,$(BUILD_DIR)/%.o,\
 									$(if $(filter 1,$(TEST_EN)),$(TEST_SRC),$(SRC)))
 DEPS := $(OBJS:.o=.d)
@@ -44,12 +42,8 @@ DEPS := $(OBJS:.o=.d)
 all : $(OBJS)
 	$(CCMD) -o $(EXNAME) $(OBJS)
 
-# ogni file oggetto nella build dipende dal suo corrispettivo file c nel source
-# ricorda che le regole scritte qua non tengono conto se i file nelle cartelle ci sono o no, make infatti per ogni prerequisito di all cercherà nel makefile la regola da seguire , essendoci qua un %, qualunque file terminante con .o e contenuto in BUILD_DIR seguirà questa regola
 $(BUILD_DIR)/%.o : $(SRC_DIR)/%.c | $(BUILD_DIR)
-	# creiamo la directory di quel file oggetto nella build
 	mkdir -p $(dir $@)
-	# compiliamo il file, ci genera anche le dipendenze dagli header
 	$(CCMD) -o $@ $< -c $(CARGS)
 
 $(BUILD_DIR):
@@ -64,5 +58,4 @@ clean :
 	rm -rf $(BUILD_DIR)/ $(EXNAME)
 
 
-# facciamo gestire le dipendenze dagli header
 -include $(DEPS)

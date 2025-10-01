@@ -66,17 +66,6 @@ mem_s *s_push(emu_s *emu, uint16_t val) {
     return mem;
   } 
   emu_die(emu, "*** Stack Overflow *** ABORT!!!");
-/*
-  printf("Pushing to stack addr 0x%x with base %p |  val %x\n", mem->sp_off, mem->mem_base, val);
-  volatile mem_p sp = mem->mem_base + mem->sp_off;
-  printf("MEMP SP PUSH: %p\n", sp);
-  if(mem->sp_off > STACK_UBOUND)
-    die("*** Stack Overflow *** ABORT!!!");
-  memcpy(sp, &val, 2);
-  printf("Push check: 0x%x\n", *((uint16_t*)sp));
-  mem->sp_off += 2;
-  return mem;
-  */
 }
 
 uint16_t s_pop(emu_s *emu) {
@@ -84,19 +73,6 @@ uint16_t s_pop(emu_s *emu) {
   if((uintptr_t)mem->sp >= (uintptr_t)(mem->mem_base + STACK_LBOUND))
     return *(--mem->sp);
   emu_die(emu, "*** Stack underflow *** ABORT!!!");
-
-  /*
-  die("*** Stack underflow *** ABORT!!!");
-  mem->sp_off -= 2;
-  printf("Popping from stack addr 0x%x with base %p\n", mem->sp_off, mem->mem_base);
-  volatile mem_p sp = mem->mem_base + mem->sp_off;
-  printf("MEMP SP POP: %p\n", sp);
-  if(mem->sp_off < STACK_LBOUND) 
-    die("*** Stack underflow *** ABORT!!!");
-  uint16_t val = 0;
-  memcpy(&val, sp, 2);
-  return val;
-  */
 }
 
 
@@ -111,7 +87,6 @@ __private mem_s *init_mem(emu_s *emu) {
   // align stack to 16bit
   unsigned unaligned = (uintptr_t)(mem->mem_base + STACK_LBOUND) & 1;
   mem->sp = (uint16_t*)(mem->mem_base + STACK_LBOUND + unaligned);
-  mem->spf = mem->sp; // member to clean UP
   // loading fontset
   assert(FONT_SADDR + sizeof(fontset) - 1 == FONT_EADDR);
   memcpy(mem->mem_base + FONT_SADDR, fontset, sizeof(fontset));
@@ -241,79 +216,71 @@ __private instr_t fetch_instr(emu_s *emu) {
 __private unsigned int exec_instr(emu_s *emu) {
  // fetch
  instr_t instr = fetch_instr(emu);
- printf("Executing instr %.4X at addr 0x%x\n", instr, emu->cpu->pc_r - 2);
- printf("start stack val: 0x%x\n", *((uint16_t*)(emu->mem->spf)));
  cpu_reg8 opcode = INSTR_OPCODE(instr);
  switch(opcode) {
    case 0x0:
-      // clear screen
       if(instr == INSTR_CLEAR_SCREEN)
         instr_clear_screen(emu);
       else if(instr == INSTR_RETURN_SUB)
-        ret_sub(emu);
+        instr_ret_sub(emu);
       break;
    case 0x1:
-      // jump
       instr_jmp(emu,  INSTR_NNN(instr));
       break;
    case 0x2:
-      call_sub(emu, INSTR_NNN(instr));
+      instr_call_sub(emu, INSTR_NNN(instr));
       break;
    case 0x3:
-      skip_eq(emu, emu->cpu->gp_r[INSTR_X(instr)], INSTR_NN(instr));
+      instr_skip_eq(emu, emu->cpu->gp_r[INSTR_X(instr)], INSTR_NN(instr));
       break;
    case 0x4:
-      skip_neq(emu, emu->cpu->gp_r[INSTR_X(instr)], INSTR_NN(instr));
+      instr_skip_neq(emu, emu->cpu->gp_r[INSTR_X(instr)], INSTR_NN(instr));
       break;
    case 0x5:
-      skip_eq(emu, emu->cpu->gp_r[INSTR_X(instr)], emu->cpu->gp_r[INSTR_Y(instr)]);
+      instr_skip_eq(emu, emu->cpu->gp_r[INSTR_X(instr)], emu->cpu->gp_r[INSTR_Y(instr)]);
       break;
    case 0x6:
-      // set register vx at NN value
-      set_vreg(emu, INSTR_X(instr), INSTR_NN(instr));
+      instr_set_vreg(emu, INSTR_X(instr), INSTR_NN(instr));
       break;
    case 0x7:
-      // add value NN to register vx, needs to modify flag register
-      add_vreg(emu, INSTR_X(instr), INSTR_NN(instr));
+      instr_add_vreg(emu, INSTR_X(instr), INSTR_NN(instr));
       break;
    case 0x8:
       switch(INSTR_N(instr)) {
         case 0x0:
-           set_xy(emu, INSTR_X(instr), INSTR_Y(instr));
+           instr_set_xy(emu, INSTR_X(instr), INSTR_Y(instr));
            break;
         case 0x1:
-           bitwise_or(emu, INSTR_X(instr), INSTR_Y(instr));
+           instr_bitwise_or(emu, INSTR_X(instr), INSTR_Y(instr));
            break;
         case 0x2:
-           bitwise_and(emu, INSTR_X(instr), INSTR_Y(instr));
+           instr_bitwise_and(emu, INSTR_X(instr), INSTR_Y(instr));
            break;
         case 0x3:
-           bitwise_xor(emu, INSTR_X(instr), INSTR_Y(instr));
+           instr_bitwise_xor(emu, INSTR_X(instr), INSTR_Y(instr));
            break;
         case 0x4:
-           add_rrc(emu, INSTR_X(instr), INSTR_Y(instr));
+           instr_add_rrc(emu, INSTR_X(instr), INSTR_Y(instr));
            break;
         case 0x5:
-           sub_rr(emu, INSTR_X(instr), INSTR_Y(instr));
+           instr_sub_rr(emu, INSTR_X(instr), INSTR_Y(instr));
            break;
         case 0x6:
-           reg_rshift(emu, INSTR_X(instr), INSTR_Y(instr));
+           instr_reg_rshift(emu, INSTR_X(instr), INSTR_Y(instr));
            break;
         case 0x7:
-           sub_rrrev(emu, INSTR_X(instr), INSTR_Y(instr));
+           instr_sub_rrrev(emu, INSTR_X(instr), INSTR_Y(instr));
            break;
         case 0xE:
-           reg_lshift(emu, INSTR_X(instr), INSTR_Y(instr));
+           instr_reg_lshift(emu, INSTR_X(instr), INSTR_Y(instr));
            break;
       }
       break;
    case 0x9:
-      // set register vx at NN value
-      skip_neq(emu, emu->cpu->gp_r[INSTR_X(instr)], emu->cpu->gp_r[INSTR_Y(instr)]);
+      instr_skip_neq(emu, emu->cpu->gp_r[INSTR_X(instr)], emu->cpu->gp_r[INSTR_Y(instr)]);
       break;
    case 0xA:
-      // set ix to NNN
-      set_ixreg(emu, INSTR_NNN(instr));
+      instr_set_ixreg(emu, INSTR_NNN(instr));
       break;
    case 0xB:
       instr_jmpoff(emu, INSTR_X(instr), INSTR_NNN(instr));
@@ -322,8 +289,7 @@ __private unsigned int exec_instr(emu_s *emu) {
       instr_rand(emu, INSTR_X(instr), INSTR_NN(instr));
       break;
    case 0xD:
-      // draw on screen
-      draw_dp(emu, INSTR_X(instr), INSTR_Y(instr), INSTR_N(instr));
+      instr_draw_dp(emu, INSTR_X(instr), INSTR_Y(instr), INSTR_N(instr));
       break;
    case 0xE:
       switch(INSTR_NN(instr)) {
@@ -389,12 +355,10 @@ __private void draw_pixmap(emu_s *emu) {
     SDL_Log("Couldn't set pixel color : %s", SDL_GetError());
     emu_die(emu, "*** EMU GRAPHICS ERROR ***");
   }
-  printf("after sdl inits stack val: 0x%x\n", *((uint16_t*)(emu->mem->spf)));
   // get scaled pixel dimensions
   uint8_t      *pixmap  = emu->dp->pixmap;
   unsigned int xpix_dim = emu->dp->res_x / CHIP_DPW;
   unsigned int ypix_dim = emu->dp->res_y / CHIP_DPH;
-  printf("after sdl dim checks stack val: 0x%x\n", *((uint16_t*)(emu->mem->spf)));
   for(size_t y = 0; y < CHIP_DPH; y++) {
     for(size_t x = 0; x < CHIP_DPW; x++) {
       if(pixmap[PIXMAP_IDX(y, x)]) {
@@ -403,20 +367,15 @@ __private void draw_pixmap(emu_s *emu) {
           SDL_Log("Couldn't draw pixel : %s", SDL_GetError());
           emu_die(emu, "*** EMU GRAPHICS ERROR ***");
         }
-        printf("after sdl fillrect stack val: 0x%x\n", *((uint16_t*)(emu->mem->spf)));
       }
     }
   }
-
-  printf("before drawpixmap end stack val: 0x%x\n", *((uint16_t*)(emu->mem->spf)));
   if(!SDL_RenderPresent(emu->dp->hw->rnd)) {
     SDL_Log("Couldn't present current renderer backbuffer : %s", SDL_GetError());
     emu_die(emu, "*** EMU GRAPHICS ERROR ***");
   }
-  printf("after drawpixmap end stack val: 0x%x\n", *((uint16_t*)(emu->mem->spf)));
 }
 
-// cpu clock emulation
 
 
 __private void poll_events(emu_s *emu, uint8_t *quit) {
@@ -439,7 +398,6 @@ __private void poll_events(emu_s *emu, uint8_t *quit) {
         emu->dp->keypad[idx].pressed = 0;
     }
   }
-  printf("after poll events stack val: 0x%x\n", *((uint16_t*)(emu->mem->spf)));
 }
 
 
@@ -463,13 +421,11 @@ void emu_loop(emu_s *emu) {
       poll_events(emu, &quit);
       if(clock_exp(dp_clk)) {
         draw_pixmap(emu);
-        printf("after draw pixmap clock exp stack val: 0x%x\n", *((uint16_t*)(emu->mem->spf)));
         // dec timers
         dec_timer(emu->cpu->s_timer);
         dec_timer(emu->cpu->d_timer);
         clock_start(dp_clk);
       }
-      printf("after clock exp if stack val: 0x%x\n", *((uint16_t*)(emu->mem->spf)));
       clock_sync(emu->cpu->clock);
   }
   free(dp_clk);

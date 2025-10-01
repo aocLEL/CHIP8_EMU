@@ -17,9 +17,7 @@ option_s PROG_OPT[] = {
 };
 
 
-// https://www.sco.com/developers/gabi/latest/ch4.eheader.html#elfid
 
-// opt ascii indexes in the opt array
 typedef enum{
   O_s,
   O_h,

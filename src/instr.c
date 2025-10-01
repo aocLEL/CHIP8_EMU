@@ -11,11 +11,9 @@
 
 
 #define __private static
-// screen refreshes (Present) are made by main emu loop
 
 
 
-// return a symbolic positive value on success
 
 unsigned int instr_clear_screen(emu_s *emu) {
   // sets all pixels to black(0)
@@ -42,12 +40,12 @@ unsigned int instr_jmpoff(emu_s *emu, chip_arg8 x_reg, chip_arg16 jmp_addr) {
   return 1;
 }
 
-unsigned int set_vreg(emu_s *emu, chip_arg8 x_reg, chip_arg8 val) {
+unsigned int instr_set_vreg(emu_s *emu, chip_arg8 x_reg, chip_arg8 val) {
   emu->cpu->gp_r[x_reg] = val;
   return 1;
 }
 
-unsigned int add_rrc(emu_s *emu, chip_arg8 x_reg, chip_arg8 y_reg) {
+unsigned int instr_add_rrc(emu_s *emu, chip_arg8 x_reg, chip_arg8 y_reg) {
   chip_arg16 res = emu->cpu->gp_r[x_reg] + emu->cpu->gp_r[y_reg];
   emu->cpu->gp_r[FLAG_REG] = res > 255 ? 1 : 0;
   emu->cpu->gp_r[x_reg] = (chip_arg8)res;
@@ -61,7 +59,7 @@ unsigned int instr_addvxix(emu_s *emu, chip_arg8 x_reg) {
   return 1;
 }
 
-unsigned int sub_rr(emu_s *emu, chip_arg8 x_reg, chip_arg8 y_reg) {
+unsigned int instr_sub_rr(emu_s *emu, chip_arg8 x_reg, chip_arg8 y_reg) {
   emu->cpu->gp_r[FLAG_REG] = 1;
   if(emu->cpu->gp_r[x_reg] < emu->cpu->gp_r[y_reg])
     emu->cpu->gp_r[FLAG_REG] = 0;
@@ -69,7 +67,7 @@ unsigned int sub_rr(emu_s *emu, chip_arg8 x_reg, chip_arg8 y_reg) {
   return 1;
 }
 
-unsigned int sub_rrrev(emu_s *emu, chip_arg8 x_reg, chip_arg8 y_reg) {
+unsigned int instr_sub_rrrev(emu_s *emu, chip_arg8 x_reg, chip_arg8 y_reg) {
   emu->cpu->gp_r[FLAG_REG] = 1;
   if(emu->cpu->gp_r[y_reg] < emu->cpu->gp_r[x_reg])
     emu->cpu->gp_r[FLAG_REG] = 0;
@@ -79,7 +77,7 @@ unsigned int sub_rrrev(emu_s *emu, chip_arg8 x_reg, chip_arg8 y_reg) {
 
 
 
-unsigned int reg_rshift(emu_s *emu, chip_arg8 x_reg, chip_arg8 y_reg) {
+unsigned int instr_reg_rshift(emu_s *emu, chip_arg8 x_reg, chip_arg8 y_reg) {
   if(!emu->chipmd)
     emu->cpu->gp_r[x_reg] = emu->cpu->gp_r[y_reg];
   emu->cpu->gp_r[FLAG_REG] = emu->cpu->gp_r[x_reg] & 0x1;
@@ -89,7 +87,7 @@ unsigned int reg_rshift(emu_s *emu, chip_arg8 x_reg, chip_arg8 y_reg) {
 
 
 
-unsigned int reg_lshift(emu_s *emu, chip_arg8 x_reg, chip_arg8 y_reg) {
+unsigned int instr_reg_lshift(emu_s *emu, chip_arg8 x_reg, chip_arg8 y_reg) {
   if(!emu->chipmd)
     emu->cpu->gp_r[x_reg] = emu->cpu->gp_r[y_reg];
   emu->cpu->gp_r[FLAG_REG] = emu->cpu->gp_r[x_reg] >> 7;
@@ -98,35 +96,31 @@ unsigned int reg_lshift(emu_s *emu, chip_arg8 x_reg, chip_arg8 y_reg) {
 }
 
 
-unsigned int add_vreg(emu_s *emu, chip_arg8 x_reg, chip_arg8 val) {
+unsigned int instr_add_vreg(emu_s *emu, chip_arg8 x_reg, chip_arg8 val) {
   emu->cpu->gp_r[x_reg] = (emu->cpu->gp_r[x_reg] + val) % 0x100;
   return 1; 
 }
 
-unsigned int set_xy(emu_s *emu, chip_arg8 x_reg, chip_arg8 y_reg) {
+unsigned int instr_set_xy(emu_s *emu, chip_arg8 x_reg, chip_arg8 y_reg) {
   emu->cpu->gp_r[x_reg] = emu->cpu->gp_r[y_reg];
   return 1;
 }
 
-// remember to protect from invalid memory accesses
 
-unsigned int call_sub(emu_s *emu, chip_arg16 sub_addr) {
-  printf("Pushing 0x%x pc into stack!!\n", emu->cpu->pc_r);
+unsigned int instr_call_sub(emu_s *emu, chip_arg16 sub_addr) {
   s_push(emu, emu->cpu->pc_r);
   emu->cpu->pc_r = sub_addr;
   return 1;
 }
 
 
-unsigned int ret_sub(emu_s *emu) {
-  puts("ret sub");
+unsigned int instr_ret_sub(emu_s *emu) {
   emu->cpu->pc_r = s_pop(emu);
-  printf("mem out %x\n", emu->cpu->pc_r);
   return 1;
 }
 
 
-unsigned int set_ixreg(emu_s *emu, chip_arg16 val) {
+unsigned int instr_set_ixreg(emu_s *emu, chip_arg16 val) {
   emu->cpu->i_r = val;
   return 1;
 }
@@ -151,13 +145,13 @@ unsigned int instr_setst(emu_s *emu, chip_arg8 x_reg) {
 
 
 // skip if
-unsigned int skip_eq(emu_s *emu, chip_arg16 op1, chip_arg16 op2) {
+unsigned int instr_skip_eq(emu_s *emu, chip_arg16 op1, chip_arg16 op2) {
   if(op1 == op2)
     emu->cpu->pc_r += 2;
   return 1;
 }
 
-unsigned int skip_neq(emu_s *emu, chip_arg16 op1, chip_arg16 op2) {
+unsigned int instr_skip_neq(emu_s *emu, chip_arg16 op1, chip_arg16 op2) {
   if(op1 != op2)
     emu->cpu->pc_r += 2;
   return 1;
@@ -179,17 +173,17 @@ unsigned int instr_skkeynpr(emu_s *emu, chip_arg8 x_reg) {
 
 
 // logical
-unsigned int bitwise_or(emu_s *emu, chip_arg8 x_reg, chip_arg8 y_reg) {
+unsigned int instr_bitwise_or(emu_s *emu, chip_arg8 x_reg, chip_arg8 y_reg) {
   emu->cpu->gp_r[x_reg] = emu->cpu->gp_r[x_reg] | emu->cpu->gp_r[y_reg];
   return 1;
 }
 
-unsigned int bitwise_and(emu_s *emu, chip_arg8 x_reg, chip_arg8 y_reg) {
+unsigned int instr_bitwise_and(emu_s *emu, chip_arg8 x_reg, chip_arg8 y_reg) {
   emu->cpu->gp_r[x_reg] = emu->cpu->gp_r[x_reg] & emu->cpu->gp_r[y_reg];
   return 1;
 }
 
-unsigned int bitwise_xor(emu_s *emu, chip_arg8 x_reg, chip_arg8 y_reg) {
+unsigned int instr_bitwise_xor(emu_s *emu, chip_arg8 x_reg, chip_arg8 y_reg) {
   emu->cpu->gp_r[x_reg] = emu->cpu->gp_r[x_reg] ^ emu->cpu->gp_r[y_reg];
   return 1;
 }
@@ -219,7 +213,7 @@ __private inline uint8_t get_pix_mode(uint8_t *pixmap, unsigned int x_c, unsigne
 }
 
 
-unsigned int draw_dp(emu_s *emu, chip_arg8 x_reg, chip_arg8 y_reg, unsigned int n_pixel) {
+unsigned int instr_draw_dp(emu_s *emu, chip_arg8 x_reg, chip_arg8 y_reg, unsigned int n_pixel) {
   uint8_t      *pixmap = emu->dp->pixmap;
   unsigned int x_c     = emu->cpu->gp_r[x_reg] % CHIP_DPW;
   unsigned int y_c     = emu->cpu->gp_r[y_reg] % CHIP_DPH;
